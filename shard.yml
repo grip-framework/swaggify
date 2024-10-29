@@ -1,0 +1,20 @@
+name: swaggify
+version: 0.1.0
+
+authors:
+  - Grip and its Contributors <https://github.com/grip-framework/>
+
+dependencies:
+  grip:
+    github: grip-framework/grip
+
+  swagger:
+    github: icyleaf/swagger
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+
+crystal: ">= 0.36.0"
+
+license: MIT
