@@ -2,6 +2,8 @@ module Swaggify
   class Handler
     include HTTP::Handler
 
+    @builder : Swagger::Builder
+
     macro finished
       def initialize(
         title : String = "Untitled API",
@@ -10,8 +12,8 @@ module Swaggify
         terms_url : String = "http://yourapp.com/terms",
         contact : Swagger::Contact = Swagger::Contact.new("John Doe", "john@doe.com", "https://john.doe"),
         license : Swagger::License = Swagger::License.new("MIT", "https://john.doe/mit"),
-        authorizations : Array(Swagger::Authorization) = [] of Swagger::Authorization)
-
+        authorizations : Array(Swagger::Authorization) = [] of Swagger::Authorization
+      )
         @builder = Swagger::Builder.new(
           title: title,
           version: version,
@@ -22,24 +24,34 @@ module Swaggify
           authorizations: authorizations
         )
 
-        {% for subclass in Grip::Controllers::Http.all_subclasses %}
-          {% controller = subclass.resolve.annotation(Swaggify::Controller) %}
-          {% actions = subclass.methods.map { |m| m.annotation(Swaggify::Action) } %}
+        {% for klass in Grip::Controllers::HTTP.includers %}
+          {% if klass.class? %}
+            {% controller = klass.annotation(Swaggify::Controller) %}
+            {% if controller %}
+              {% actions = klass.methods.select { |m| m.annotation(Swaggify::Action) } %}
 
-          @builder.add(Swagger::Controller.new(
-            name: {{controller["name"]}},
-            description: {{controller["description"]}},
-            actions: [{% for action in actions %} Swagger::Action.new(
-              method: {{action["method"]}},
-              route: {{action["route"]}},
-              # Set default nil and empty values for non descriptive routes.
-              responses: {{action["responses"]}} || [] of Swagger::Response,
-              request: {{action["request"]}} || nil,
-              summary: {{action["summary"]}} || nil,
-              parameters: {{action["parameters"]}} || [] of Swagger::Parameter,
-              description: {{action["description"]}} || nil,
-              authorization: {{action["authorization"]}} || false,
-              deprecated: {{action["deprecated"]}} || false), {% end %}] of Swagger::Action))
+              @builder.add(Swagger::Controller.new(
+                name: {{controller["name"]}},
+                description: {{controller["description"]}},
+                actions: [
+                  {% for method in actions %}
+                    {% action = method.annotation(Swaggify::Action) %}
+                    Swagger::Action.new(
+                      method: {{action["method"]}},
+                      route: {{action["route"]}},
+                      responses: {{action["responses"]}} || [] of Swagger::Response,
+                      request: {{action["request"]}},
+                      summary: {{action["summary"]}},
+                      parameters: {{action["parameters"]}} || [] of Swagger::Parameter,
+                      description: {{action["description"]}},
+                      authorization: {{action["authorization"]}} || false,
+                      deprecated: {{action["deprecated"]}} || false,
+                    ),
+                  {% end %}
+                ] of Swagger::Action
+              ))
+            {% end %}
+          {% end %}
         {% end %}
       end
     end
@@ -48,17 +60,15 @@ module Swaggify
       if context.request.path.includes?("document.json")
         context.response.headers.merge!({"Content-Type" => "application/json; charset=UTF-8"})
         context.response.print(@builder.built.to_json)
-
-        context
       else
         title = "Swagger UI"
         openapi_url = "/swagger/document.json"
 
         context.response.headers.merge!({"Content-Type" => "text/html; charset=UTF-8"})
         context.response.print(ECR.render("./lib/swagger/src/swagger/http/views/swagger.ecr"))
-
-        context
       end
+
+      context
     end
   end
 end

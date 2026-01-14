@@ -1,7 +1,9 @@
 require "../src/swaggify"
 
 @[Swaggify::Controller(name: "Test Controller", description: "A test controller to experiment with Swagger!")]
-class TestController < Grip::Controllers::Http
+class TestController
+  include Grip::Controllers::HTTP
+
   @[Swaggify::Action(
     method: "GET",
     route: "/v1/index/{id}",
@@ -22,10 +24,19 @@ class TestController < Grip::Controllers::Http
   end
 end
 
-class Application < Grip::Application
-  def initialize
-    super(environment: "development")
+class Application
+  include Grip::Application
 
+  property handlers : Array(HTTP::Handler) = [
+    Grip::Handlers::Exception.new,
+    Grip::Handlers::HTTP.new
+  ] of HTTP::Handler
+
+  def initialize
+    routes
+  end
+
+  def routes
     scope "/v1" do
       get "/index/:id", TestController, as: :index
     end
